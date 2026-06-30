@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Upload Documents — Knowledge Co-Pilot</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">🧠</div>
+        <span class="sidebar-title">Knowledge Co-Pilot</span>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Navigation</div>
+        <div class="corpus-item" onclick="window.location.href='corpus.html'">
+          <span class="corpus-item-icon">📚</span>
+          <span class="corpus-item-name">My Corpora</span>
+        </div>
+        <div class="corpus-item" onclick="window.location.href='chat.html'">
+          <span class="corpus-item-icon">💬</span>
+          <span class="corpus-item-name">Chat</span>
+        </div>
+        <div class="corpus-item active">
+          <span class="corpus-item-icon">📤</span>
+          <span class="corpus-item-name">Upload Documents</span>
+        </div>
+      </div>
+
+      <div class="sidebar-section" style="flex:1; overflow-y:auto;">
+        <div class="sidebar-section-title">Active Corpus</div>
+        <div style="font-size:0.88rem; color:var(--color-primary); font-weight:600; padding:0.25rem 0;" id="sidebar-corpus-name">—</div>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="user-avatar" id="user-avatar">??</div>
+        <span class="user-email" id="user-email">Loading…</span>
+        <button class="btn-icon" id="logout-btn" title="Sign out" style="margin-left:auto">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="topbar">
+        <span class="topbar-title" id="topbar-title">Upload Documents</span>
+        <div class="topbar-actions">
+          <button class="btn btn-secondary btn-sm" onclick="window.location.href='chat.html'" style="width:auto">
+            💬 Go to Chat
+          </button>
+        </div>
+      </div>
+
+      <div class="upload-page">
+        <div id="alert" class="alert" style="margin-bottom:1rem;"></div>
+
+        <!-- Drop Zone -->
+        <div class="upload-zone" id="drop-zone">
+          <div class="upload-icon">📁</div>
+          <h3>Drag &amp; drop files here</h3>
+          <p>or click to browse your computer</p>
+          <div class="upload-types">
+            <span class="upload-type-badge">.pdf</span>
+            <span class="upload-type-badge">.docx</span>
+            <span class="upload-type-badge">.txt</span>
+            <span class="upload-type-badge">.md</span>
+          </div>
+          <input type="file" id="file-input" accept=".pdf,.docx,.txt,.md" multiple style="display:none" />
+        </div>
+
+        <!-- Upload Progress -->
+        <div class="upload-progress" id="upload-progress">
+          <div class="progress-bar-wrap">
+            <div class="progress-bar" id="progress-bar"></div>
+          </div>
+          <div class="progress-label" id="progress-label">Uploading…</div>
+        </div>
+
+        <!-- Queued Files -->
+        <div id="queue-section" style="margin:1rem 0; display:none;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem;">
+            <h3 style="font-size:1rem;">Files to upload (<span id="queue-count">0</span>)</h3>
+            <button class="btn btn-primary btn-sm" id="upload-all-btn" style="width:auto">Upload All</button>
+          </div>
+          <div class="documents-list" id="queue-list"></div>
+        </div>
+
+        <!-- Uploaded Documents -->
+        <div id="docs-section">
+          <h3 style="font-size:1rem; margin-bottom:0.75rem;" id="docs-title">Documents in this corpus</h3>
+          <div class="documents-list" id="docs-list">
+            <div style="color:var(--color-text-muted); font-size:0.88rem; text-align:center; padding:2rem;">
+              No documents uploaded yet.
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script>
+    UI.requireAuth();
+
+    const corpusId = UI.getActiveCorpusId();
+    const corpusName = UI.getActiveCorpusName();
+
+    if (!corpusId) {
+      window.location.href = "corpus.html";
+    }
+
+    // Set UI labels
+    document.getElementById("sidebar-corpus-name").textContent = corpusName;
+    document.getElementById("topbar-title").textContent = `Upload to: ${corpusName}`;
+    document.getElementById("docs-title").textContent = `Documents in "${corpusName}"`;
+
+    const email = KC.getUserEmail();
+    document.getElementById("user-email").textContent = email;
+    document.getElementById("user-avatar").textContent = UI.getInitials(email);
+
+    const alertEl = document.getElementById("alert");
+    const dropZone = document.getElementById("drop-zone");
+    const fileInput = document.getElementById("file-input");
+    const progressEl = document.getElementById("upload-progress");
+    const progressBar = document.getElementById("progress-bar");
+    const progressLabel = document.getElementById("progress-label");
+    const queueSection = document.getElementById("queue-section");
+    const queueList = document.getElementById("queue-list");
+    const queueCount = document.getElementById("queue-count");
+    const uploadAllBtn = document.getElementById("upload-all-btn");
+    const docsList = document.getElementById("docs-list");
+
+    let fileQueue = [];
+    const uploadedDocs = [];
+
+    // ─── Drag & Drop ───────────────────────────────────────────────────────────
+    dropZone.addEventListener("click", () => fileInput.click());
+
+    dropZone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropZone.classList.add("drag-over");
+    });
+
+    dropZone.addEventListener("dragleave", () => {
+      dropZone.classList.remove("drag-over");
+    });
+
+    dropZone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropZone.classList.remove("drag-over");
+      const files = Array.from(e.dataTransfer.files);
+      addFilesToQueue(files);
+    });
+
+    fileInput.addEventListener("change", () => {
+      addFilesToQueue(Array.from(fileInput.files));
+      fileInput.value = "";
+    });
+
+    const ALLOWED = [".pdf", ".docx", ".txt", ".md"];
+
+    function addFilesToQueue(files) {
+      const validFiles = files.filter((f) => {
+        const ext = "." + f.name.split(".").pop().toLowerCase();
+        return ALLOWED.includes(ext);
+      });
+
+      const invalidCount = files.length - validFiles.length;
+      if (invalidCount > 0) {
+        UI.showAlert(
+          alertEl,
+          `${invalidCount} file(s) skipped — only PDF, DOCX, TXT, and MD are supported.`,
+          "info"
+        );
+        setTimeout(() => UI.hideAlert(alertEl), 4000);
+      }
+
+      if (validFiles.length === 0) return;
+
+      fileQueue = [...fileQueue, ...validFiles];
+      renderQueue();
+    }
+
+    function renderQueue() {
+      queueList.innerHTML = "";
+      if (fileQueue.length === 0) {
+        queueSection.style.display = "none";
+        return;
+      }
+
+      queueSection.style.display = "block";
+      queueCount.textContent = fileQueue.length;
+
+      fileQueue.forEach((file, idx) => {
+        const ext = file.name.split(".").pop().toLowerCase();
+        const card = document.createElement("div");
+        card.className = "document-card";
+        card.innerHTML = `
+          <div class="document-icon">${UI.getFileIcon(ext)}</div>
+          <div class="document-info">
+            <div class="document-name">${UI.escapeHtml(file.name)}</div>
+            <div class="document-meta">${(file.size / 1024).toFixed(1)} KB</div>
+          </div>
+          <button class="btn btn-danger btn-sm remove-btn" data-idx="${idx}">Remove</button>
+        `;
+        card.querySelector(".remove-btn").addEventListener("click", () => {
+          fileQueue.splice(idx, 1);
+          renderQueue();
+        });
+        queueList.appendChild(card);
+      });
+    }
+
+    // ─── Upload All ────────────────────────────────────────────────────────────
+    uploadAllBtn.addEventListener("click", async () => {
+      if (fileQueue.length === 0) return;
+
+      uploadAllBtn.disabled = true;
+      UI.hideAlert(alertEl);
+
+      const filesToUpload = [...fileQueue];
+      fileQueue = [];
+      renderQueue();
+
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const file = filesToUpload[i];
+        progressEl.classList.add("visible");
+        progressLabel.textContent = `Uploading ${i + 1}/${filesToUpload.length}: ${file.name}`;
+
+        try {
+          const result = await KC.uploadDocument(corpusId, file, (pct) => {
+            progressBar.style.width = pct + "%";
+          });
+          uploadedDocs.unshift(result.document);
+          renderDocs();
+          UI.showAlert(alertEl, `"${file.name}" uploaded and indexed (${result.document.chunk_count} chunks).`, "success");
+          setTimeout(() => UI.hideAlert(alertEl), 4000);
+        } catch (err) {
+          UI.showAlert(alertEl, `Failed to upload "${file.name}": ${err.message}`, "error");
+        }
+
+        progressBar.style.width = "0%";
+      }
+
+      progressEl.classList.remove("visible");
+      uploadAllBtn.disabled = false;
+    });
+
+    // ─── Render Uploaded Docs ──────────────────────────────────────────────────
+    function renderDocs() {
+      if (uploadedDocs.length === 0) {
+        docsList.innerHTML = `<div style="color:var(--color-text-muted); font-size:0.88rem; text-align:center; padding:2rem;">No documents uploaded yet.</div>`;
+        return;
+      }
+
+      docsList.innerHTML = "";
+      uploadedDocs.forEach((doc) => {
+        const card = document.createElement("div");
+        card.className = "document-card";
+        card.innerHTML = `
+          <div class="document-icon">${UI.getFileIcon(doc.file_type)}</div>
+          <div class="document-info">
+            <div class="document-name">${UI.escapeHtml(doc.original_filename)}</div>
+            <div class="document-meta">${doc.chunk_count} chunks · ${UI.formatDate(doc.uploaded_at)}</div>
+          </div>
+          <span style="font-size:0.75rem; color:var(--color-accent); font-weight:600;">✓ Indexed</span>
+        `;
+        docsList.appendChild(card);
+      });
+    }
+
+    // ─── Logout ────────────────────────────────────────────────────────────────
+    document.getElementById("logout-btn").addEventListener("click", () => {
+      KC.clearAuth();
+      window.location.href = "login.html";
+    });
+
+    renderDocs();
+  </script>
+</body>
+</html>

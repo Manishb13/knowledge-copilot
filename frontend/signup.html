@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign Up — Knowledge Co-Pilot</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body class="auth-page">
+
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">🧠</div>
+      <span class="auth-logo-text">Knowledge Co-Pilot</span>
+    </div>
+
+    <h1>Create your account</h1>
+    <p class="subtitle">Start building your personal knowledge base</p>
+
+    <div id="alert" class="alert"></div>
+
+    <form id="signup-form" novalidate>
+      <div class="form-group">
+        <label class="form-label" for="email">Email address</label>
+        <input
+          class="form-input"
+          type="email"
+          id="email"
+          name="email"
+          placeholder="you@example.com"
+          autocomplete="email"
+          required
+        />
+        <span class="form-error" id="email-error"></span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <input
+          class="form-input"
+          type="password"
+          id="password"
+          name="password"
+          placeholder="Minimum 8 characters"
+          autocomplete="new-password"
+          required
+        />
+        <span class="form-error" id="password-error"></span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="confirm-password">Confirm password</label>
+        <input
+          class="form-input"
+          type="password"
+          id="confirm-password"
+          name="confirm-password"
+          placeholder="Repeat your password"
+          autocomplete="new-password"
+          required
+        />
+        <span class="form-error" id="confirm-error"></span>
+      </div>
+
+      <button class="btn btn-primary" type="submit" id="submit-btn">
+        Create account
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      Already have an account? <a href="login.html">Sign in</a>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script>
+    UI.redirectIfLoggedIn();
+
+    const form = document.getElementById("signup-form");
+    const alertEl = document.getElementById("alert");
+    const submitBtn = document.getElementById("submit-btn");
+    const emailInput = document.getElementById("email");
+    const passwordInput = document.getElementById("password");
+    const confirmInput = document.getElementById("confirm-password");
+    const emailError = document.getElementById("email-error");
+    const passwordError = document.getElementById("password-error");
+    const confirmError = document.getElementById("confirm-error");
+
+    function clearErrors() {
+      UI.hideAlert(alertEl);
+      [emailError, passwordError, confirmError].forEach((el) => {
+        el.classList.remove("visible");
+        el.textContent = "";
+      });
+    }
+
+    function validateForm() {
+      let valid = true;
+
+      if (!emailInput.value.trim()) {
+        emailError.textContent = "Email is required";
+        emailError.classList.add("visible");
+        valid = false;
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.value.trim())) {
+        emailError.textContent = "Please enter a valid email address";
+        emailError.classList.add("visible");
+        valid = false;
+      }
+
+      if (!passwordInput.value) {
+        passwordError.textContent = "Password is required";
+        passwordError.classList.add("visible");
+        valid = false;
+      } else if (passwordInput.value.length < 8) {
+        passwordError.textContent = "Password must be at least 8 characters";
+        passwordError.classList.add("visible");
+        valid = false;
+      }
+
+      if (!confirmInput.value) {
+        confirmError.textContent = "Please confirm your password";
+        confirmError.classList.add("visible");
+        valid = false;
+      } else if (passwordInput.value !== confirmInput.value) {
+        confirmError.textContent = "Passwords do not match";
+        confirmError.classList.add("visible");
+        valid = false;
+      }
+
+      return valid;
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      clearErrors();
+
+      if (!validateForm()) return;
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner"></span> Creating account…';
+
+      try {
+        const data = await KC.signup(
+          emailInput.value.trim(),
+          passwordInput.value
+        );
+        KC.saveAuth(data.access_token, data.user_id, data.email);
+        window.location.href = "corpus.html";
+      } catch (err) {
+        UI.showAlert(alertEl, err.message || "Signup failed. Please try again.", "error");
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Create account";
+      }
+    });
+  </script>
+</body>
+</html>

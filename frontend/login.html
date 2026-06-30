@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login — Knowledge Co-Pilot</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body class="auth-page">
+
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">🧠</div>
+      <span class="auth-logo-text">Knowledge Co-Pilot</span>
+    </div>
+
+    <h1>Welcome back</h1>
+    <p class="subtitle">Sign in to your account to continue</p>
+
+    <div id="alert" class="alert"></div>
+
+    <form id="login-form" novalidate>
+      <div class="form-group">
+        <label class="form-label" for="email">Email address</label>
+        <input
+          class="form-input"
+          type="email"
+          id="email"
+          name="email"
+          placeholder="you@example.com"
+          autocomplete="email"
+          required
+        />
+        <span class="form-error" id="email-error"></span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <input
+          class="form-input"
+          type="password"
+          id="password"
+          name="password"
+          placeholder="••••••••"
+          autocomplete="current-password"
+          required
+        />
+        <span class="form-error" id="password-error"></span>
+      </div>
+
+      <button class="btn btn-primary" type="submit" id="submit-btn">
+        Sign in
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      Don't have an account? <a href="signup.html">Create one</a>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script>
+    UI.redirectIfLoggedIn();
+
+    const form = document.getElementById("login-form");
+    const alert = document.getElementById("alert");
+    const submitBtn = document.getElementById("submit-btn");
+    const emailInput = document.getElementById("email");
+    const passwordInput = document.getElementById("password");
+    const emailError = document.getElementById("email-error");
+    const passwordError = document.getElementById("password-error");
+
+    function clearErrors() {
+      UI.hideAlert(alert);
+      emailError.classList.remove("visible");
+      passwordError.classList.remove("visible");
+      emailError.textContent = "";
+      passwordError.textContent = "";
+    }
+
+    function validateForm() {
+      let valid = true;
+
+      if (!emailInput.value.trim()) {
+        emailError.textContent = "Email is required";
+        emailError.classList.add("visible");
+        valid = false;
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.value.trim())) {
+        emailError.textContent = "Please enter a valid email address";
+        emailError.classList.add("visible");
+        valid = false;
+      }
+
+      if (!passwordInput.value) {
+        passwordError.textContent = "Password is required";
+        passwordError.classList.add("visible");
+        valid = false;
+      }
+
+      return valid;
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      clearErrors();
+
+      if (!validateForm()) return;
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner"></span> Signing in…';
+
+      try {
+        const data = await KC.login(
+          emailInput.value.trim(),
+          passwordInput.value
+        );
+        KC.saveAuth(data.access_token, data.user_id, data.email);
+        window.location.href = "corpus.html";
+      } catch (err) {
+        UI.showAlert(alert, err.message || "Login failed. Please try again.", "error");
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Sign in";
+      }
+    });
+  </script>
+</body>
+</html>

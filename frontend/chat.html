@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chat — Knowledge Co-Pilot</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">🧠</div>
+        <span class="sidebar-title">Knowledge Co-Pilot</span>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Navigation</div>
+        <div class="corpus-item" onclick="window.location.href='corpus.html'">
+          <span class="corpus-item-icon">📚</span>
+          <span class="corpus-item-name">My Corpora</span>
+        </div>
+        <div class="corpus-item active">
+          <span class="corpus-item-icon">💬</span>
+          <span class="corpus-item-name">Chat</span>
+        </div>
+        <div class="corpus-item" onclick="window.location.href='upload.html'">
+          <span class="corpus-item-icon">📤</span>
+          <span class="corpus-item-name">Upload Documents</span>
+        </div>
+      </div>
+
+      <div class="sidebar-section" style="flex:1;">
+        <div class="sidebar-section-title">Active Corpus</div>
+        <div style="font-size:0.88rem; color:var(--color-primary); font-weight:600; padding:0.25rem 0;" id="sidebar-corpus-name">—</div>
+        <button class="btn btn-danger btn-sm" id="clear-history-btn" style="width:100%; margin-top:0.75rem;">
+          🗑 Clear History
+        </button>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="user-avatar" id="user-avatar">??</div>
+        <span class="user-email" id="user-email">Loading…</span>
+        <button class="btn-icon" id="logout-btn" title="Sign out" style="margin-left:auto">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="topbar">
+        <div style="display:flex; align-items:center; gap:0.75rem; flex:1;">
+          <span class="topbar-title" id="topbar-title">Chat</span>
+          <span style="font-size:0.78rem; color:var(--color-text-muted);" id="topbar-corpus">Select a corpus</span>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-secondary btn-sm" onclick="window.location.href='upload.html'" style="width:auto">
+            📤 Upload Docs
+          </button>
+        </div>
+      </div>
+
+      <div class="chat-layout">
+        <!-- Messages Area -->
+        <div class="chat-messages" id="chat-messages">
+          <div class="chat-empty" id="chat-empty">
+            <div class="chat-empty-icon">🧠</div>
+            <h2>Ask anything about your documents</h2>
+            <p>Upload documents to this corpus, then ask questions. Every answer includes citations pointing back to the source passage.</p>
+            <button class="btn btn-primary" onclick="window.location.href='upload.html'" style="width:auto; margin-top:0.5rem;">
+              📤 Upload Documents
+            </button>
+          </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="chat-input-area">
+          <div class="chat-input-wrap">
+            <textarea
+              class="chat-input"
+              id="chat-input"
+              placeholder="Ask a question about your documents…"
+              rows="1"
+            ></textarea>
+            <button class="chat-send-btn" id="send-btn" title="Send (Enter)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="22" y1="2" x2="11" y2="13"/>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+            </button>
+          </div>
+          <div class="chat-input-hint">Press <kbd style="font-size:0.7rem;background:var(--color-surface-3);padding:1px 5px;border-radius:3px;border:1px solid var(--color-border)">Enter</kbd> to send · <kbd style="font-size:0.7rem;background:var(--color-surface-3);padding:1px 5px;border-radius:3px;border:1px solid var(--color-border)">Shift+Enter</kbd> for new line</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Citation Modal -->
+  <div class="modal-overlay" id="citation-overlay">
+    <div class="modal citation-modal">
+      <div class="modal-header">
+        <h2>📎 Source Passage</h2>
+        <button class="btn-icon" id="citation-close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="citation-modal-source" id="citation-source"></div>
+      <div class="citation-modal-page" id="citation-page"></div>
+      <div class="citation-modal-text" id="citation-text"></div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script>
+    UI.requireAuth();
+
+    const corpusId = UI.getActiveCorpusId();
+    const corpusName = UI.getActiveCorpusName();
+
+    if (!corpusId) {
+      window.location.href = "corpus.html";
+    }
+
+    // UI references
+    document.getElementById("sidebar-corpus-name").textContent = corpusName;
+    document.getElementById("topbar-corpus").textContent = `/ ${corpusName}`;
+
+    const email = KC.getUserEmail();
+    document.getElementById("user-email").textContent = email;
+    document.getElementById("user-avatar").textContent = UI.getInitials(email);
+
+    const messagesEl = document.getElementById("chat-messages");
+    const chatEmptyEl = document.getElementById("chat-empty");
+    const chatInput = document.getElementById("chat-input");
+    const sendBtn = document.getElementById("send-btn");
+    const citationOverlay = document.getElementById("citation-overlay");
+
+    let isLoading = false;
+
+    // ─── Load History ──────────────────────────────────────────────────────────
+    async function loadHistory() {
+      try {
+        const history = await KC.getChatHistory(corpusId);
+        if (history && history.length > 0) {
+          chatEmptyEl.style.display = "none";
+          history.forEach((msg) => {
+            appendMessage(msg.role, msg.content, msg.citations || [], msg.created_at, false);
+          });
+          scrollToBottom();
+        }
+      } catch (err) {
+        console.error("Failed to load history:", err);
+      }
+    }
+
+    // ─── Send Message ──────────────────────────────────────────────────────────
+    async function sendMessage() {
+      const question = chatInput.value.trim();
+      if (!question || isLoading) return;
+
+      chatEmptyEl.style.display = "none";
+      isLoading = true;
+      chatInput.value = "";
+      chatInput.style.height = "auto";
+      sendBtn.disabled = true;
+
+      appendMessage("user", question, [], new Date().toISOString(), false);
+      const thinkingEl = appendThinking();
+      scrollToBottom();
+
+      try {
+        const data = await KC.queryCorpus(corpusId, question);
+        thinkingEl.remove();
+        appendMessage("assistant", data.answer, data.citations || [], new Date().toISOString(), true);
+        scrollToBottom();
+      } catch (err) {
+        thinkingEl.remove();
+        appendMessage(
+          "assistant",
+          `⚠️ Error: ${err.message}`,
+          [],
+          new Date().toISOString(),
+          false
+        );
+        scrollToBottom();
+      } finally {
+        isLoading = false;
+        sendBtn.disabled = false;
+        chatInput.focus();
+      }
+    }
+
+    // ─── Append Message ────────────────────────────────────────────────────────
+    function appendMessage(role, content, citations, timestamp, animate) {
+      const group = document.createElement("div");
+      group.className = `message-group ${role}`;
+
+      if (animate) {
+        group.style.opacity = "0";
+        group.style.transform = "translateY(10px)";
+        group.style.transition = "opacity 0.3s ease, transform 0.3s ease";
+      }
+
+      const avatarEl = document.createElement("div");
+      avatarEl.className = "message-avatar";
+      avatarEl.textContent = role === "user" ? UI.getInitials(email) : "🧠";
+
+      const bodyEl = document.createElement("div");
+      bodyEl.className = "message-body";
+
+      const bubbleEl = document.createElement("div");
+      bubbleEl.className = "message-bubble";
+      bubbleEl.textContent = content;
+
+      const timeEl = document.createElement("div");
+      timeEl.className = "message-time";
+      timeEl.textContent = UI.formatTime(timestamp);
+
+      bodyEl.appendChild(bubbleEl);
+      bodyEl.appendChild(timeEl);
+
+      if (role === "assistant" && citations && citations.length > 0) {
+        const citList = buildCitationsEl(citations);
+        bodyEl.appendChild(citList);
+      }
+
+      group.appendChild(avatarEl);
+      group.appendChild(bodyEl);
+      messagesEl.appendChild(group);
+
+      if (animate) {
+        requestAnimationFrame(() => {
+          group.style.opacity = "1";
+          group.style.transform = "translateY(0)";
+        });
+      }
+
+      return group;
+    }
+
+    // ─── Thinking Indicator ────────────────────────────────────────────────────
+    function appendThinking() {
+      const group = document.createElement("div");
+      group.className = "message-group assistant";
+
+      const avatarEl = document.createElement("div");
+      avatarEl.className = "message-avatar";
+      avatarEl.textContent = "🧠";
+
+      const bodyEl = document.createElement("div");
+      bodyEl.className = "message-body";
+
+      const indicator = document.createElement("div");
+      indicator.className = "thinking-indicator";
+      indicator.innerHTML = `
+        <div class="thinking-dot"></div>
+        <div class="thinking-dot"></div>
+        <div class="thinking-dot"></div>
+      `;
+
+      bodyEl.appendChild(indicator);
+      group.appendChild(avatarEl);
+      group.appendChild(bodyEl);
+      messagesEl.appendChild(group);
+
+      return group;
+    }
+
+    // ─── Citations ─────────────────────────────────────────────────────────────
+    function buildCitationsEl(citations) {
+      const list = document.createElement("div");
+      list.className = "citations-list";
+
+      citations.forEach((cit, i) => {
+        const tag = document.createElement("button");
+        tag.className = "citation-tag";
+        tag.innerHTML = `
+          <span class="citation-num">${i + 1}</span>
+          <span>
+            <strong>${UI.escapeHtml(cit.filename)}</strong>
+            ${cit.page_number ? ` · p.${cit.page_number}` : ""}
+          </span>
+        `;
+        tag.addEventListener("click", () => openCitationModal(cit, i + 1));
+        list.appendChild(tag);
+      });
+
+      return list;
+    }
+
+    // ─── Citation Modal ────────────────────────────────────────────────────────
+    function openCitationModal(citation, num) {
+      document.getElementById("citation-source").textContent = `📄 Source: ${citation.filename}`;
+      document.getElementById("citation-page").textContent =
+        citation.page_number ? `Page ${citation.page_number}` : "";
+      document.getElementById("citation-text").textContent = citation.chunk_text;
+      citationOverlay.classList.add("visible");
+    }
+
+    document.getElementById("citation-close").addEventListener("click", () => {
+      citationOverlay.classList.remove("visible");
+    });
+
+    citationOverlay.addEventListener("click", (e) => {
+      if (e.target === citationOverlay) citationOverlay.classList.remove("visible");
+    });
+
+    // ─── Clear History ─────────────────────────────────────────────────────────
+    document.getElementById("clear-history-btn").addEventListener("click", async () => {
+      if (!confirm("Clear all conversation history for this corpus?")) return;
+
+      try {
+        await KC.clearChatHistory(corpusId);
+        // Remove all messages except the empty state
+        Array.from(messagesEl.children).forEach((child) => {
+          if (child.id !== "chat-empty") child.remove();
+        });
+        chatEmptyEl.style.display = "";
+      } catch (err) {
+        alert("Failed to clear history: " + err.message);
+      }
+    });
+
+    // ─── Input Handling ────────────────────────────────────────────────────────
+    chatInput.addEventListener("input", () => {
+      UI.autoResizeTextarea(chatInput);
+    });
+
+    chatInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    sendBtn.addEventListener("click", sendMessage);
+
+    // ─── Scroll ────────────────────────────────────────────────────────────────
+    function scrollToBottom() {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    // ─── Logout ────────────────────────────────────────────────────────────────
+    document.getElementById("logout-btn").addEventListener("click", () => {
+      KC.clearAuth();
+      window.location.href = "login.html";
+    });
+
+    // ─── Keyboard shortcut: Escape to close citation modal ────────────────────
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") citationOverlay.classList.remove("visible");
+    });
+
+    // Initialize
+    loadHistory();
+    chatInput.focus();
+  </script>
+</body>
+</html>

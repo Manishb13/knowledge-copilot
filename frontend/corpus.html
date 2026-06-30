@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Corpora — Knowledge Co-Pilot</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">🧠</div>
+        <span class="sidebar-title">Knowledge Co-Pilot</span>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Navigation</div>
+        <div class="corpus-item active">
+          <span class="corpus-item-icon">📚</span>
+          <span class="corpus-item-name">My Corpora</span>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="user-avatar" id="user-avatar">??</div>
+        <span class="user-email" id="user-email">Loading…</span>
+        <button class="btn-icon" id="logout-btn" title="Sign out" style="margin-left:auto">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="topbar">
+        <span class="topbar-title">My Knowledge Corpora</span>
+        <div class="topbar-actions">
+          <button class="btn btn-primary" id="new-corpus-btn" style="width:auto">
+            + New Corpus
+          </button>
+        </div>
+      </div>
+
+      <div class="corpus-page" id="corpus-page">
+        <div class="corpus-page-header">
+          <h1>Your Knowledge Bases</h1>
+          <p>Select a corpus to start chatting, or create a new one to upload documents.</p>
+        </div>
+
+        <div id="alert" class="alert"></div>
+
+        <div class="corpus-grid" id="corpus-grid">
+          <!-- Corpus cards rendered here -->
+          <div class="corpus-card corpus-card-new" id="new-corpus-card">
+            <div class="corpus-card-icon">＋</div>
+            <div class="corpus-card-name">Create New Corpus</div>
+            <div class="corpus-card-desc">Upload documents and start asking questions</div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- New Corpus Modal -->
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Create New Corpus</h2>
+        <button class="btn-icon" id="modal-close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <div id="modal-alert" class="alert"></div>
+
+      <div class="form-group">
+        <label class="form-label" for="corpus-name">Corpus name *</label>
+        <input class="form-input" type="text" id="corpus-name" placeholder="e.g. Client A Research" maxlength="80" />
+        <span class="form-error" id="corpus-name-error"></span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="corpus-desc">Description (optional)</label>
+        <input class="form-input" type="text" id="corpus-desc" placeholder="What is this corpus about?" maxlength="200" />
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
+        <button class="btn btn-primary" id="modal-submit" style="width:auto">Create Corpus</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirm Modal -->
+  <div class="modal-overlay" id="delete-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Delete Corpus</h2>
+      </div>
+      <p style="color:var(--color-text-secondary); margin-bottom:1.5rem;">
+        Are you sure you want to delete <strong id="delete-corpus-name"></strong>?
+        This will permanently remove all documents and conversation history.
+      </p>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="delete-cancel">Cancel</button>
+        <button class="btn btn-danger" id="delete-confirm" style="width:auto">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script>
+    UI.requireAuth();
+
+    const email = KC.getUserEmail();
+    document.getElementById("user-email").textContent = email;
+    document.getElementById("user-avatar").textContent = UI.getInitials(email);
+
+    const alertEl = document.getElementById("alert");
+    const modalAlert = document.getElementById("modal-alert");
+    const corpusGrid = document.getElementById("corpus-grid");
+    const modalOverlay = document.getElementById("modal-overlay");
+    const deleteOverlay = document.getElementById("delete-overlay");
+    const newCorpusCard = document.getElementById("new-corpus-card");
+
+    let corpora = [];
+    let pendingDeleteId = null;
+
+    // ─── Load Corpora ──────────────────────────────────────────────────────────
+    async function loadCorpora() {
+      try {
+        const data = await KC.listCorpora();
+        corpora = data.corpora || [];
+        renderCorpora();
+      } catch (err) {
+        UI.showAlert(alertEl, "Failed to load corpora: " + err.message, "error");
+      }
+    }
+
+    function renderCorpora() {
+      // Remove all cards except the "new" card
+      Array.from(corpusGrid.children).forEach((child) => {
+        if (child.id !== "new-corpus-card") child.remove();
+      });
+
+      corpora.forEach((corpus) => {
+        const card = document.createElement("div");
+        card.className = "corpus-card";
+        card.dataset.id = corpus.id;
+        card.innerHTML = `
+          <div class="corpus-card-icon">📂</div>
+          <div class="corpus-card-name">${UI.escapeHtml(corpus.name)}</div>
+          <div class="corpus-card-desc">${UI.escapeHtml(corpus.description || "No description")}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div class="corpus-card-meta">Created ${UI.formatDate(corpus.created_at)}</div>
+            <button class="btn btn-sm btn-danger delete-btn" data-id="${corpus.id}" data-name="${UI.escapeHtml(corpus.name)}">Delete</button>
+          </div>
+        `;
+
+        card.addEventListener("click", (e) => {
+          if (e.target.closest(".delete-btn")) return;
+          openCorpus(corpus);
+        });
+
+        card.querySelector(".delete-btn").addEventListener("click", (e) => {
+          e.stopPropagation();
+          pendingDeleteId = corpus.id;
+          document.getElementById("delete-corpus-name").textContent = corpus.name;
+          deleteOverlay.classList.add("visible");
+        });
+
+        corpusGrid.insertBefore(card, newCorpusCard);
+      });
+    }
+
+    function openCorpus(corpus) {
+      UI.setActiveCorpus(corpus.id, corpus.name);
+      window.location.href = "chat.html";
+    }
+
+    // ─── New Corpus Modal ──────────────────────────────────────────────────────
+    function openModal() {
+      document.getElementById("corpus-name").value = "";
+      document.getElementById("corpus-desc").value = "";
+      document.getElementById("corpus-name-error").classList.remove("visible");
+      UI.hideAlert(modalAlert);
+      modalOverlay.classList.add("visible");
+      setTimeout(() => document.getElementById("corpus-name").focus(), 100);
+    }
+
+    function closeModal() {
+      modalOverlay.classList.remove("visible");
+    }
+
+    document.getElementById("new-corpus-btn").addEventListener("click", openModal);
+    newCorpusCard.addEventListener("click", openModal);
+    document.getElementById("modal-close").addEventListener("click", closeModal);
+    document.getElementById("modal-cancel").addEventListener("click", closeModal);
+
+    modalOverlay.addEventListener("click", (e) => {
+      if (e.target === modalOverlay) closeModal();
+    });
+
+    document.getElementById("modal-submit").addEventListener("click", async () => {
+      const nameInput = document.getElementById("corpus-name");
+      const descInput = document.getElementById("corpus-desc");
+      const nameError = document.getElementById("corpus-name-error");
+
+      nameError.classList.remove("visible");
+      UI.hideAlert(modalAlert);
+
+      const name = nameInput.value.trim();
+      if (!name) {
+        nameError.textContent = "Corpus name is required";
+        nameError.classList.add("visible");
+        return;
+      }
+
+      const btn = document.getElementById("modal-submit");
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Creating…';
+
+      try {
+        const corpus = await KC.createCorpus(name, descInput.value.trim());
+        corpora.unshift(corpus);
+        renderCorpora();
+        closeModal();
+        UI.showAlert(alertEl, `Corpus "${name}" created successfully!`, "success");
+        setTimeout(() => UI.hideAlert(alertEl), 3000);
+      } catch (err) {
+        UI.showAlert(modalAlert, err.message || "Failed to create corpus", "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Create Corpus";
+      }
+    });
+
+    // ─── Delete Corpus ─────────────────────────────────────────────────────────
+    document.getElementById("delete-cancel").addEventListener("click", () => {
+      deleteOverlay.classList.remove("visible");
+      pendingDeleteId = null;
+    });
+
+    deleteOverlay.addEventListener("click", (e) => {
+      if (e.target === deleteOverlay) {
+        deleteOverlay.classList.remove("visible");
+        pendingDeleteId = null;
+      }
+    });
+
+    document.getElementById("delete-confirm").addEventListener("click", async () => {
+      if (!pendingDeleteId) return;
+
+      const btn = document.getElementById("delete-confirm");
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>';
+
+      try {
+        await KC.deleteCorpus(pendingDeleteId);
+        corpora = corpora.filter((c) => c.id !== pendingDeleteId);
+        renderCorpora();
+        deleteOverlay.classList.remove("visible");
+        UI.showAlert(alertEl, "Corpus deleted successfully.", "success");
+        setTimeout(() => UI.hideAlert(alertEl), 3000);
+      } catch (err) {
+        UI.showAlert(alertEl, "Failed to delete corpus: " + err.message, "error");
+        deleteOverlay.classList.remove("visible");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Delete";
+        pendingDeleteId = null;
+      }
+    });
+
+    // ─── Logout ────────────────────────────────────────────────────────────────
+    document.getElementById("logout-btn").addEventListener("click", () => {
+      KC.clearAuth();
+      window.location.href = "login.html";
+    });
+
+    // ─── Enter key in modal ────────────────────────────────────────────────────
+    document.getElementById("corpus-name").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") document.getElementById("modal-submit").click();
+    });
+
+    // Initialize
+    loadCorpora();
+  </script>
+</body>
+</html>

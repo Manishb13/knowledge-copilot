@@ -1,0 +1,77 @@
+# ------------------------------
+# Python
+# ------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environments
+venv/
+.venv/
+env/
+backend/venv/
+
+# Environment Variables
+.env
+backend/.env
+
+# Build files
+dist/
+build/
+.eggs/
+*.egg-info/
+
+# ------------------------------
+# Databases
+# ------------------------------
+*.db
+*.sqlite
+*.sqlite3
+backend/*.db
+backend/*.sqlite3
+
+# ------------------------------
+# Chroma Vector Database
+# ------------------------------
+chroma_db/
+backend/chroma_db/
+
+# ------------------------------
+# Uploaded Files
+# ------------------------------
+uploads/
+backend/uploads/
+
+# ------------------------------
+# IDE
+# ------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ------------------------------
+# OS Files
+# ------------------------------
+.DS_Store
+Thumbs.db
+
+# ------------------------------
+# Logs
+# ------------------------------
+*.log
+logs/
+
+# ------------------------------
+# Node
+# ------------------------------
+node_modules/
+package-lock.json
+
+# ------------------------------
+# Generated Documents
+# ------------------------------
+*.docx
+Knowledge_Copilot_Setup_Guide.docx
