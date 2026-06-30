@@ -3,7 +3,7 @@
  * All HTTP requests to the FastAPI backend go through this module.
  */
 
-const API_BASE = window.API_BASE || "http://localhost:8000/api";
+const API_BASE = "https://knowledge-copilot-3vo4.onrender.com/api";
 
 /**
  * Read the JWT token from localStorage.
