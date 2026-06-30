@@ -10,6 +10,9 @@ from app.routes import auth, corpora, upload, query
 
 load_dotenv()
 
+os.makedirs("uploads", exist_ok=True)
+os.makedirs("chroma_db", exist_ok=True)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
